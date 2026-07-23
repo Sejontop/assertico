@@ -18,9 +18,9 @@ export function AdminSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden w-56 shrink-0 border-r border-border bg-card/50 md:block">
+    <aside className="hidden w-56 shrink-0 border-r border-black/5 bg-secondary/30 backdrop-blur-xl dark:border-white/10 md:block">
       <div className="px-4 py-5">
-        <span className="font-mono text-sm font-semibold tracking-tight">
+        <span className="font-mono text-sm font-semibold tracking-tight gradient-text">
           assertico <span className="text-muted-foreground">/admin</span>
         </span>
       </div>
@@ -36,9 +36,9 @@ export function AdminSidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                "rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                 isActive
-                  ? "bg-secondary text-foreground"
+                  ? "bg-secondary text-foreground shadow-sm"
                   : "text-muted-foreground hover:bg-secondary hover:text-foreground"
               )}
             >

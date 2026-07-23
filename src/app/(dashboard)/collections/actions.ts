@@ -10,13 +10,14 @@ import {
   deleteSavedRequest,
   saveRequestToCollection
 } from "@/lib/collections";
+import type { CollectionActionState } from "@/lib/collection-types";
 import type { BodyType, HttpMethod } from "@/types";
 
-export interface CollectionActionState {
-  error: string | null;
-}
+// export interface CollectionActionState {
+//   error: string | null;
+// }
 
-export const initialCollectionState: CollectionActionState = { error: null };
+//export const initialCollectionState: CollectionActionState = { error: null };
 
 export async function createCollectionAction(
   _prevState: CollectionActionState,

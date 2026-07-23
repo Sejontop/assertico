@@ -12,45 +12,48 @@
     --popover-foreground: 222 20% 10%;
     --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 14% 96%;
+    --secondary: 220 20% 97%;
     --secondary-foreground: 222 20% 10%;
-    --muted: 220 14% 96%;
+    --muted: 220 20% 97%;
     --muted-foreground: 220 9% 46%;
-    --accent: 220 14% 96%;
+    --accent: 220 20% 97%;
     --accent-foreground: 222 20% 10%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
+    --border: 220 15% 90%;
+    --input: 220 15% 90%;
     --ring: 217 91% 60%;
-    --radius: 0.5rem;
+    --radius: 0.75rem;
   }
 
   .dark {
-    --background: 222 25% 7%;
-    --foreground: 210 20% 92%;
-    --card: 222 22% 10%;
-    --card-foreground: 210 20% 92%;
-    --popover: 222 22% 10%;
-    --popover-foreground: 210 20% 92%;
+    /* Deep navy/near-black, closer to bg-zinc-950 / bg-slate-950 than the
+       previous flat dark-gray, so glass panels and gradient glows read
+       clearly against it. */
+    --background: 224 71% 4%;
+    --foreground: 210 20% 94%;
+    --card: 224 45% 8%;
+    --card-foreground: 210 20% 94%;
+    --popover: 224 45% 8%;
+    --popover-foreground: 210 20% 94%;
     --primary: 217 91% 65%;
-    --primary-foreground: 222 25% 7%;
-    --secondary: 222 18% 15%;
-    --secondary-foreground: 210 20% 92%;
-    --muted: 222 18% 15%;
-    --muted-foreground: 217 12% 60%;
-    --accent: 222 18% 15%;
-    --accent-foreground: 210 20% 92%;
-    --destructive: 0 63% 51%;
-    --destructive-foreground: 210 20% 92%;
-    --success: 142 60% 45%;
-    --success-foreground: 210 20% 92%;
-    --border: 222 15% 18%;
-    --input: 222 15% 18%;
+    --primary-foreground: 224 71% 4%;
+    --secondary: 223 30% 13%;
+    --secondary-foreground: 210 20% 94%;
+    --muted: 223 30% 13%;
+    --muted-foreground: 217 12% 63%;
+    --accent: 223 30% 13%;
+    --accent-foreground: 210 20% 94%;
+    --destructive: 0 63% 55%;
+    --destructive-foreground: 210 20% 94%;
+    --success: 142 60% 48%;
+    --success-foreground: 210 20% 94%;
+    --border: 222 25% 16%;
+    --input: 222 25% 16%;
     --ring: 217 91% 65%;
-    --radius: 0.5rem;
+    --radius: 0.75rem;
   }
 
   * {
@@ -60,5 +63,81 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  /* Glass panel — the base look for cards, navbars, and hero widgets. */
+  .glass {
+    @apply border border-black/5 bg-white/70 backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.04];
+  }
+
+  .glass-strong {
+    @apply border border-black/10 bg-white/90 backdrop-blur-xl dark:border-white/15 dark:bg-white/[0.07];
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-blue-600 via-cyan-500 to-violet-600 bg-clip-text text-transparent dark:from-blue-400 dark:via-cyan-300 dark:to-violet-400;
+  }
+
+  .gradient-primary {
+    @apply bg-gradient-to-r from-blue-600 to-cyan-500;
+  }
+
+  .card-hover {
+    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-blue-500/10;
+  }
+
+  .glow-blue {
+    box-shadow: 0 0 60px -15px rgba(59, 130, 246, 0.45);
+  }
+
+  .glow-violet {
+    box-shadow: 0 0 60px -15px rgba(139, 92, 246, 0.45);
+  }
+
+  .animate-float {
+    animation: assertico-float 6s ease-in-out infinite;
+  }
+
+  .animate-gradient {
+    background-size: 200% 200%;
+    animation: assertico-gradient-shift 8s ease infinite;
+  }
+
+  .animate-pulse-dot {
+    animation: assertico-pulse-dot 2s ease-in-out infinite;
+  }
+}
+
+@keyframes assertico-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+@keyframes assertico-gradient-shift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes assertico-pulse-dot {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
   }
 }
