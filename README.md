@@ -1,65 +1,200 @@
 # Assertico
 
-An API testing and validation platform — send requests, assert on the
-response, diff two payloads, and keep a searchable history of everything
-you've run. Built with Next.js 15 (App Router), TypeScript, Prisma,
-Supabase Auth, Tailwind CSS, and a small set of hand-rolled UI primitives
-styled in the shadcn/ui convention.
+An enterprise-grade API testing, validation, and contract intelligence platform — send requests, assert on response telemetry, semantically diff payloads with AI, and retain a persistent, searchable history of test executions. Built with Next.js 15 (App Router), TypeScript, Prisma ORM, Supabase Auth, Tailwind CSS, and headless UI primitives styled to shadcn/ui conventions.
+
+---
 
 ## Features
 
-- **Auth** — Supabase-backed signup/login/logout, session refresh via
-  middleware, protected dashboard routes.
-- **Request builder** — GET/POST/PUT/PATCH/DELETE, editable headers/query
-  params/body (JSON, raw, form-data), URL validation, request
-  cancellation via `AbortController`.
-- **Response viewer** — status, timing, size, pretty-printed & syntax
-  highlighted JSON, headers table, copy-to-clipboard.
-- **Assertion engine** (`lib/assertion-engine.ts`) — status/body/header
-  assertions with `equals`, `notEquals`, `contains`, `exists`,
-  `greaterThan`, `lessThan`, and `regex` operators over dot-notation JSON
-  paths. No `eval`.
-- **Diff checker** (`lib/diff.ts`) — deep, key-order-normalized JSON diff
-  with an added/removed/changed summary and a highlighted tree view.
-- **History** — every completed request is logged (method, url, headers,
-  body, status, duration — never the response body), with server-rendered
-  search/filter/pagination and one-click duplicate.
-- **Dashboard** — total requests, assertions passed/failed, average
-  response time, most-used method, recent activity.
-- **Collections** — group saved requests, open/save/update them from the
-  builder, delete collections/requests.
+- **Authentication & Multi-Tenant Access Control** — Supabase Auth session management (signup/login/logout), edge middleware token verification, and role-based route guards (`USER`, `ADMIN`).
+- **Resilient Request Builder** — Supports standard HTTP verbs (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`), dynamic key-value headers, query parameter serialization, raw/JSON/form-data request bodies, and client-side lifecycle cancellation via `AbortController`.
+- **High-Resolution Response Telemetry** — Microsecond-accurate response latency tracking, HTTP status badges, payload byte counting, formatted syntax-highlighted JSON rendering, and headers tables.
+- **Deterministic Assertion Engine (`lib/assertion-engine.ts`)** — Multi-target evaluation (`STATUS`, `RESPONSE_TIME`, `BODY`, `HEADER`) running against strict operators (`EQUALS`, `NOT_EQUALS`, `CONTAINS`, `EXISTS`, `GREATER_THAN`, `LESS_THAN`, `REGEX`). Dot-notation object traversal with zero `eval` dependencies.
+- **Structural Diff Engine (`lib/diff.ts`)** — Recursive, key-order-normalized AST JSON comparator categorizing nodes into `added`, `removed`, `changed`, and `unchanged` states across arbitrary depths.
+- **AI Semantic Contract Analysis (`/api/ai/analyze-diff`)** — Hybrid LLM diagnostic layer powered by Groq (`openai/gpt-oss-120b`). Digests deterministic AST deltas and socket latency shifts to flag breaking changes, SDK deprecation risks, PII/secret leaks, and payload recommendations.
+- **Bounded Audit History** — Automatic logging of execution events (method, URL, headers, truncated body, status, duration, pass/fail counts). Omits response payloads to ensure zero database bloat and strict compliance.
+- **Aggregated Analytics Dashboard** — Global telemetry reporting total executions, assertion pass/fail distributions, average response latency, dominant HTTP methods, and paginated recent runs.
+- **Hierarchical Collections** — Group and organize target API endpoints into logical namespaces with full cascade-delete support.
 
-## Project structure
+---
 
-```
+## System Architecture
+
+Assertico implements a hybrid execution and validation architecture. It decouples high-speed deterministic evaluation from heavy LLM contract analysis, enforcing strict network sandboxing on all outbound requests.
+
++===============================================================================+
+|                                      CLIENT BROWSER                                       |
+|                                                                                           |
+|  +-------------------------------------------------------------------------------------+  |
+|  |                             Next.js 15 UI / React 19                                |  |
+|  |  - Request Builder & Dynamic Environment Interpolation ({{baseUrl}})               |  |
+|  |  - Interactive Diff Checker UI (Side-by-Side Payload Diffs & Clipboard Actions)     |  |
+|  |  - AI Semantic Contract Diagnostic Panel & Risk Badge Visualizer                   |  |
+|  +-------------------------------------------------------------------------------------+  |
+|             |                                                       ^                     |
+|             | 1. HTTP Proxy Payload                                 | 4. Telemetry & Body |
+|             v                                                       |                     |
++=|=======================|=+
+|                                                       |
++=|===================================|=+
+|             v                                                       |                     |
+|  +------------------------------------------------------------------+------------------+  |
+|  |                         NEXT.JS BACKEND RUNTIME (Node.js API)                        |  |
+|  |                                                                                      |  |
+|  |  +--------------------------------------------------------------------------------+  |  |
+|  |  |                 SSRF-Sandboxed Proxy (/api/proxy/route.ts)                     |  |  |
+|  |  |  - DNS resolution validation (blocks RFC 1918 private subnets, loopbacks, AWS) |  |  |
+|  |  |  - Low-level socket instrumentation via performance.now()                       |  |  |
+|  |  |  - Enforces hard execution timeouts & maximum payload byte limits               |  |  |
+|  |  +--------------------------------------------------------------------------------+  |  |
+|  +------------------------------------------|-------------------------------------------+  |
++=|=+
+|
+| 2. Secure Outbound Call
+| 3. Response Stream
+v
++-------------------------------------+
+|         TARGET SERVER / API         |
+|     (External Public Endpoint)      |
++-------------------------------------+
+
+
+### Deterministic vs. AI Analysis Pipeline
+
+[ Response Payload A ] + [ Response Payload B ]
+│
+▼
+┌────────────────────────────────────────┐
+│  Deterministic TS Diff Engine          │  <-- Executes in < 2ms (lib/diff.ts)
+│  - Key-order normalization             │      - Computes Added/Removed/Changed keys
+│  - Latency difference computation      │      - Prevents token bloat
+└────────────────────────────────────────┘
+│
+▼ Flattened AST Delta & Telemetry
+┌────────────────────────────────────────┐
+│  AI Semantic Diagnostic Layer          │  <-- /api/ai/analyze-diff (Groq)
+│  - Model: openai/gpt-oss-120b          │      - Detects primitive type mutations
+│  - Structured JSON Output Validation   │      - Flags leaked credentials & PII
+│  - Zero-Token Guardrail on Identical   │      - Delivers payload adoption recommendation
+└────────────────────────────────────────┘
+│
+▼
+[ Actionable UI Diagnostic Card ]
+
+
+---
+
+## Database Schema (Prisma ORM)
+
++------------------+             +----------------------+
+|       User       |             |       AuditLog       |
++------------------+             +----------------------+
+| id (PK)          | 1         * | id (PK)              |
+| email            |------------>| adminId (FK)         |
+| role             |             | action, targetType   |
+| createdAt        |             | metadata (Json)      |
++------------------+             +----------------------+
+| 1          | 1
+|            |
+| *          | *
+v            v
++------------+  +-----------------------------------------+
+| Collection |  |             RequestHistory              |
++------------+  +-----------------------------------------+
+| id (PK)    |  | id (PK), userId (FK), requestId (FK)    |
+| userId(FK) |  | method, url, status, durationMs         |
+| name, desc |  | headers, body (bounded JSON)            |
++------------+  | assertionsPassed, assertionsFailed      |
+| 1        +-----------------------------------------+
+| *
+v
++------------+
+|  Request   |
++------------+
+| id (PK)    | 1         * +------------------------------+
+| collId(FK) |------------>|          Assertion           |
+| method, url|             +------------------------------+
+| body, auth |             | id (PK), requestId (FK)      |
++------------+             | type (STATUS, BODY, etc.)    |
+| operator, expectedValue      |
++------------------------------+
+
+
+---
+
+## Project Structure
+
+```text
 src/
-  app/            Route segments (App Router)
-    (auth)/        login, signup
-    (dashboard)/   dashboard, requests, collections, assertions, diff,
-                   history, settings
-    api/           /api/proxy (server-side request execution)
-  components/      Presentational + composed UI, grouped by feature
-  hooks/           Reusable client-side state (key-value pairs,
-                   assertions, request sending, clipboard)
-  lib/             Business logic: prisma, supabase, request execution,
-                   assertion engine, diff engine, history, collections,
-                   auth, validators — kept out of components entirely
-  types/           Shared domain types
-  utils/           Small stateless helpers (cn, ids, formatting, colors)
-prisma/
-  schema.prisma    User -> Collection -> Request -> Assertion,
-                   plus RequestHistory
-```
+├── app/
+│   ├── (auth)/                    # Authentication flows (login, register)
+│   ├── (dashboard)/               # Protected workspace routes
+│   │   ├── assertions/            # Global assertions inventory
+│   │   ├── collections/           # Collection management views
+│   │   ├── dashboard/             # Global metrics & telemetry graphs
+│   │   ├── diff/                  # Visual payload comparator & AI diagnostic
+│   │   ├── history/               # Request execution logs
+│   │   ├── requests/              # Request builder & runner
+│   │   └── settings/              # Workspace configurations
+│   └── api/
+│       ├── ai/
+│       │   └── analyze-diff/      # Semantic contract AI route (Groq integration)
+│       └── proxy/                 # SSRF-sandboxed request proxy
+├── components/
+│   ├── dashboard/                 # Analytics summary cards & recent activity
+│   ├── diff/                      # Diff viewer, AST tree view, summary, AI card
+│   ├── request/                   # Request editor, headers/body inputs, run controls
+│   └── ui/                        # Button, Input, Modal, Badge, Dropdown primitives
+├── hooks/                         # Key-value state, diff AI triggers, clipboard utils
+├── lib/
+│   ├── assertion-engine.ts        # Pure, deterministic validation engine
+│   ├── diff.ts                    # Dynamic recursive AST diff engine
+│   ├── prisma.ts                  # Shared database client
+│   └── proxy.ts                   # Network socket & DNS resolution hooks
+├── types/
+│   ├── ai-diff.ts                 # Contracts for LLM semantic analysis responses
+│   └── index.ts                   # Core application domain types
+└── utils/                         # Class-variance authority (cn), formatting, helpers
+Getting Started
+Prerequisites
+Node.js 18.17+ or Node.js 20+
 
-## Setup
+PostgreSQL database instance (or Supabase project)
 
-```bash
+Groq API Key (free tier available at console.groq.com)
+
+Installation
+Clone the repository and install dependencies:
+
+Bash
+git clone [https://github.com/your-username/assertico.git](https://github.com/your-username/assertico.git)
+cd assertico
 npm install
-cp .env.example .env
-# fill in DATABASE_URL, DIRECT_URL, and the Supabase keys in .env
+Configure environment variables:
+
+Bash
+cp .env.example .env.local
+Provide the required secrets in .env.local:
+
+Code snippet
+# Database (PostgreSQL / Supabase)
+DATABASE_URL="postgresql://postgres:[password]@db.[project].supabase.co:5432/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://postgres:[password]@db.[project].supabase.co:5432/postgres"
+
+# Supabase Auth
+NEXT_PUBLIC_SUPABASE_URL="https://[project].supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="your-anon-key"
+SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
+
+# AI Semantic Contract Analysis Engine
+GROQ_API_KEY="gsk_yourGroqApiKeyHere"
+Run database migrations:
+
+Bash
 npx prisma generate
 npx prisma migrate dev --name init
-npm run dev
-```
+Start the development server:
 
-App runs at http://localhost:3000.
+Bash
+npm run dev
+Open http://localhost:3000 in your browser.
