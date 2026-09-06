@@ -16,15 +16,12 @@ const BODY_TEXTAREA_CLASSES =
 
 export default function AssertionsPage() {
   const [status, setStatus] = useState("200");
+  const [responseTime, setResponseTime] = useState("120"); // 1. Mock response time state
   const [bodyText, setBodyText] = useState('{\n  "success": true,\n  "data": {\n    "id": 1\n  }\n}');
 
   const headers = useKeyValuePairs();
   const assertions = useAssertions();
 
-  // Mirrors how the response proxy decides isJson: try to parse, and if it
-  // fails, fall back to treating the body as a raw string. This lets
-  // CONTAINS/REGEX/EQUALS still work against non-JSON bodies, same as the
-  // real request/response flow.
   const parsedBody: unknown = useMemo(() => {
     try {
       return bodyText.trim().length > 0 ? JSON.parse(bodyText) : null;
@@ -44,12 +41,14 @@ export default function AssertionsPage() {
 
   const assertionResults: AssertionResult[] = useMemo(() => {
     const numericStatus = Number(status);
+    const numericLatency = Number(responseTime);
     return runAssertions(assertions.assertions, {
       status: Number.isFinite(numericStatus) ? numericStatus : 0,
       body: parsedBody,
-      headers: headerRecord
+      headers: headerRecord,
+      responseTimeMs: Number.isFinite(numericLatency) ? numericLatency : 0 // 2. Pass to engine
     });
-  }, [assertions.assertions, status, parsedBody, headerRecord]);
+  }, [assertions.assertions, status, responseTime, parsedBody, headerRecord]);
 
   const assertionResultsById = useMemo(
     () => new Map(assertionResults.map((result) => [result.id, result])),
@@ -71,16 +70,30 @@ export default function AssertionsPage() {
         <div className="space-y-4">
           <h2 className="text-sm font-semibold">Mock response</h2>
 
-          <div className="space-y-2">
-            <Label htmlFor="status">Status code</Label>
-            <Input
-              id="status"
-              type="number"
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
-              placeholder="200"
-              className="w-32 font-mono"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="status">Status code</Label>
+              <Input
+                id="status"
+                type="number"
+                value={status}
+                onChange={(event) => setStatus(event.target.value)}
+                placeholder="200"
+                className="w-full font-mono"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="responseTime">Response time (ms)</Label>
+              <Input
+                id="responseTime"
+                type="number"
+                value={responseTime}
+                onChange={(event) => setResponseTime(event.target.value)}
+                placeholder="120"
+                className="w-full font-mono"
+              />
+            </div>
           </div>
 
           <div className="space-y-2">

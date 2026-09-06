@@ -22,7 +22,7 @@ interface AssertionRowProps {
   onRemove: () => void;
 }
 
-const TYPES: AssertionType[] = ["STATUS", "BODY", "HEADER"];
+const TYPES: AssertionType[] = ["STATUS", "BODY", "HEADER", "RESPONSE_TIME"];
 const OPERATORS: AssertionOperator[] = [
   "EQUALS",
   "NOT_EQUALS",
@@ -34,7 +34,7 @@ const OPERATORS: AssertionOperator[] = [
 ];
 
 export function AssertionRow({ assertion, result, onChange, onRemove }: AssertionRowProps) {
-  const needsPath = assertion.type !== "STATUS";
+  const needsPath = assertion.type === "BODY" || assertion.type === "HEADER";
 
   return (
     <div className="flex items-start gap-2">
@@ -44,12 +44,15 @@ export function AssertionRow({ assertion, result, onChange, onRemove }: Assertio
 
       <select
         value={assertion.type}
-        onChange={(event) =>
+        onChange={(event) => {
+          const nextType = event.target.value as AssertionType;
           onChange({
-            type: event.target.value as AssertionType,
-            path: event.target.value === "STATUS" ? null : assertion.path
-          })
-        }
+            type: nextType,
+            path: nextType === "BODY" || nextType === "HEADER" ? assertion.path : null,
+            operator: nextType === "RESPONSE_TIME" ? "LESS_THAN" : assertion.operator,
+            expectedValue: nextType === "RESPONSE_TIME" ? "200" : assertion.expectedValue
+          });
+        }}
         className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
       >
         {TYPES.map((type) => (
@@ -62,7 +65,13 @@ export function AssertionRow({ assertion, result, onChange, onRemove }: Assertio
       <Input
         value={assertion.path ?? ""}
         onChange={(event) => onChange({ path: event.target.value })}
-        placeholder={assertion.type === "HEADER" ? "content-type" : "data.user.id"}
+        placeholder={
+          assertion.type === "HEADER"
+            ? "content-type"
+            : assertion.type === "RESPONSE_TIME"
+              ? "N/A"
+              : "data.user.id"
+        }
         disabled={!needsPath}
         className="flex-1 font-mono"
       />
@@ -83,7 +92,11 @@ export function AssertionRow({ assertion, result, onChange, onRemove }: Assertio
         value={assertion.expectedValue}
         onChange={(event) => onChange({ expectedValue: event.target.value })}
         placeholder={
-          assertion.operator === "EXISTS" ? "true or false" : "Expected value"
+          assertion.type === "RESPONSE_TIME"
+            ? "Max ms (e.g. 200)"
+            : assertion.operator === "EXISTS"
+              ? "true or false"
+              : "Expected value"
         }
         className="flex-1 font-mono"
       />

@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/layout/theme-provider";
-// CSS is processed by Next.js at runtime; TypeScript may not have a declaration for it.
-// @ts-expect-error -- intentional side-effect import of a global stylesheet
 import "./globals.css";
 
 const fontSans = Inter({

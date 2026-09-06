@@ -13,6 +13,7 @@ export interface SendRequestArgs {
   bodyType: BodyType;
   bodyText: string;
   formData: KeyValuePair[];
+  variables?: Record<string, string | number | boolean>;
 }
 
 export function useRequestSender() {
@@ -22,15 +23,15 @@ export function useRequestSender() {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const send = useCallback(async (args: SendRequestArgs) => {
-    const urlCheck = urlSchema.safeParse(args.url);
-    if (!urlCheck.success) {
-      setError(urlCheck.error.issues[0]?.message ?? "Enter a valid URL");
-      setResponse(null);
-      return;
+    if (!args.url.includes("{{")) {
+      const urlCheck = urlSchema.safeParse(args.url);
+      if (!urlCheck.success) {
+        setError(urlCheck.error.issues[0]?.message ?? "Enter a valid URL");
+        setResponse(null);
+        return;
+      }
     }
 
-    // Cancel whatever request is currently in flight before starting a new
-    // one, so a slow first request can never overwrite a faster second one.
     abortControllerRef.current?.abort();
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -47,6 +48,7 @@ export function useRequestSender() {
         bodyType: args.bodyType,
         bodyText: args.bodyText,
         formData: args.formData,
+        variables: args.variables,
         signal: controller.signal
       });
       setResponse(result);

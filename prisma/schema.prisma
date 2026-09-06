@@ -109,6 +109,7 @@ enum AssertionType {
   STATUS
   BODY
   HEADER
+  RESPONSE_TIME
 }
 
 enum AssertionOperator {

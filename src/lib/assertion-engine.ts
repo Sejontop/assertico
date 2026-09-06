@@ -9,6 +9,7 @@ export interface AssertionContext {
   status: number;
   body: unknown;
   headers: Record<string, string>;
+  responseTimeMs: number;
 }
 
 interface PathLookup {
@@ -16,12 +17,6 @@ interface PathLookup {
   value: unknown;
 }
 
-/**
- * Resolves a dot-notation path (e.g. "data.user.id" or "data.items.length")
- * against a JSON value. Works for both object keys and array indices/
- * "length" because JavaScript's `in` operator and index access behave the
- * same way for arrays as for plain objects.
- */
 export function getValueByPath(source: unknown, path: string): PathLookup {
   const segments = path.split(".").filter((segment) => segment.length > 0);
 
@@ -112,6 +107,14 @@ function resolveSubject(
     return { found: true, value: context.status, label: "status" };
   }
 
+  if (type === "RESPONSE_TIME") {
+    return {
+      found: true,
+      value: context.responseTimeMs,
+      label: "response time"
+    };
+  }
+
   if (type === "HEADER") {
     const headerName = (definition.path ?? "").trim();
     const match = Object.entries(context.headers).find(
@@ -124,7 +127,6 @@ function resolveSubject(
     };
   }
 
-  // BODY
   const path = (definition.path ?? "").trim();
   const { found, value } = getValueByPath(context.body, path);
   return { found, value, label: path ? `body.${path}` : "body" };
@@ -162,23 +164,25 @@ export function runAssertion(
   switch (operator) {
     case "EQUALS": {
       const passed = valuesLooselyEqual(value, definition.expectedValue);
+      const suffix = definition.type === "RESPONSE_TIME" ? "ms" : "";
       return {
         id: definition.id,
         passed,
         message: passed
-          ? `${label} equals ${describeValue(value)}`
-          : `Expected ${label} to equal "${definition.expectedValue}", got ${describeValue(value)}`
+          ? `${label} equals ${describeValue(value)}${suffix}`
+          : `Expected ${label} to equal "${definition.expectedValue}${suffix}", got ${describeValue(value)}${suffix}`
       };
     }
 
     case "NOT_EQUALS": {
       const passed = !valuesLooselyEqual(value, definition.expectedValue);
+      const suffix = definition.type === "RESPONSE_TIME" ? "ms" : "";
       return {
         id: definition.id,
         passed,
         message: passed
-          ? `${label} does not equal "${definition.expectedValue}"`
-          : `Expected ${label} to not equal "${definition.expectedValue}"`
+          ? `${label} does not equal "${definition.expectedValue}${suffix}"`
+          : `Expected ${label} to not equal "${definition.expectedValue}${suffix}"`
       };
     }
 
@@ -204,12 +208,13 @@ export function runAssertion(
         };
       }
       const passed = actualNumber > expectedNumber;
+      const unit = definition.type === "RESPONSE_TIME" ? "ms" : "";
       return {
         id: definition.id,
         passed,
         message: passed
-          ? `${label} (${actualNumber}) is greater than ${expectedNumber}`
-          : `Expected ${label} (${actualNumber}) to be greater than ${expectedNumber}`
+          ? `${label} (${actualNumber}${unit}) is greater than ${expectedNumber}${unit}`
+          : `Expected ${label} (${actualNumber}${unit}) to be greater than ${expectedNumber}${unit}`
       };
     }
 
@@ -224,12 +229,13 @@ export function runAssertion(
         };
       }
       const passed = actualNumber < expectedNumber;
+      const unit = definition.type === "RESPONSE_TIME" ? "ms" : "";
       return {
         id: definition.id,
         passed,
         message: passed
-          ? `${label} (${actualNumber}) is less than ${expectedNumber}`
-          : `Expected ${label} (${actualNumber}) to be less than ${expectedNumber}`
+          ? `${label} (${actualNumber}${unit}) is less than ${expectedNumber}${unit}`
+          : `Expected ${label} (${actualNumber}${unit}) to be less than ${expectedNumber}${unit}`
       };
     }
 

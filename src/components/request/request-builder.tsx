@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { UrlBar } from "@/components/request/url-bar";
 import { KeyValueEditor } from "@/components/request/key-value-editor";
 import { BodyEditor } from "@/components/request/body-editor";
@@ -18,7 +18,7 @@ import { saveHistoryEntry } from "@/app/(dashboard)/history/actions";
 import { createId } from "@/utils/id";
 import type { AssertionResult, BodyType, HttpMethod, KeyValuePair } from "@/types";
 
-type PanelTab = "headers" | "params" | "body" | "assertions";
+type PanelTab = "headers" | "params" | "body" | "assertions" | "variables";
 
 interface CollectionOption {
   id: string;
@@ -39,13 +39,9 @@ interface RequestBuilderProps {
 }
 
 function recordToPairs(record: Record<string, string> | undefined): KeyValuePair[] | undefined {
-  if (!record) {
-    return undefined;
-  }
+  if (!record) return undefined;
   const entries = Object.entries(record);
-  if (entries.length === 0) {
-    return undefined;
-  }
+  if (entries.length === 0) return undefined;
   return entries.map(([key, value]) => ({ id: createId(), key, value, enabled: true }));
 }
 
@@ -75,10 +71,30 @@ export function RequestBuilder({
 
   const headers = useKeyValuePairs(recordToPairs(initialHeaders));
   const queryParams = useKeyValuePairs(recordToPairs(initialQueryParams));
+  const variables = useKeyValuePairs([
+    { id: createId(), key: "baseUrl", value: "https://httpbin.org", enabled: true }
+  ]);
   const formData = useKeyValuePairs();
   const assertions = useAssertions();
 
   const { response, error, isLoading, send, cancel } = useRequestSender();
+
+  // Preserves exact sent payload so user typing during transit doesn't taint the logged history
+  const sentPayloadRef = useRef<{
+    method: HttpMethod;
+    finalUrl: string;
+    headerRecord: Record<string, string>;
+    bodyText: string | null;
+  } | null>(null);
+
+  const variableMap = useMemo(() => {
+    return variables.pairs
+      .filter((p) => p.enabled && p.key.trim().length > 0)
+      .reduce<Record<string, string>>((acc, p) => {
+        acc[p.key] = p.value;
+        return acc;
+      }, {});
+  }, [variables.pairs]);
 
   const assertionResults: AssertionResult[] = useMemo(() => {
     if (!response) {
@@ -87,7 +103,8 @@ export function RequestBuilder({
     return runAssertions(assertions.assertions, {
       status: response.status,
       body: response.body,
-      headers: response.headers
+      headers: response.headers,
+      responseTimeMs: response.durationMs
     });
   }, [response, assertions.assertions]);
 
@@ -96,12 +113,8 @@ export function RequestBuilder({
     [assertionResults]
   );
 
-  useEffect(() => {
-    if (!response) {
-      return;
-    }
-
-    const finalUrl = buildUrlWithQueryParams(url, queryParams.pairs);
+  const handleSend = async () => {
+    const finalUrl = buildUrlWithQueryParams(url, queryParams.pairs, { variables: variableMap });
     const headerRecord = headers.pairs
       .filter((pair) => pair.enabled && pair.key.trim().length > 0)
       .reduce<Record<string, string>>((acc, pair) => {
@@ -109,14 +122,40 @@ export function RequestBuilder({
         return acc;
       }, {});
 
+    const bodyForStorage = bodyType === "NONE" ? null : bodyText;
+
+    sentPayloadRef.current = {
+      method,
+      finalUrl,
+      headerRecord,
+      bodyText: bodyForStorage
+    };
+
+    await send({
+      method,
+      url,
+      headers: headers.pairs,
+      queryParams: queryParams.pairs,
+      bodyType,
+      bodyText,
+      formData: formData.pairs,
+      variables: variableMap
+    });
+  };
+
+  // Safely persist to history in the commit phase via useEffect
+  useEffect(() => {
+    if (!response || !sentPayloadRef.current) return;
+
+    const { method: sentMethod, finalUrl, headerRecord, bodyText: sentBody } = sentPayloadRef.current;
     const passed = assertionResults.filter((result) => result.passed).length;
     const failed = assertionResults.length - passed;
 
     void saveHistoryEntry({
-      method,
+      method: sentMethod,
       url: finalUrl,
       headers: headerRecord,
-      body: bodyType === "NONE" ? null : bodyText,
+      body: sentBody,
       status: response.status,
       durationMs: response.durationMs,
       assertionsPassed: passed,
@@ -125,18 +164,6 @@ export function RequestBuilder({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [response]);
 
-  const handleSend = () => {
-    void send({
-      method,
-      url,
-      headers: headers.pairs,
-      queryParams: queryParams.pairs,
-      bodyType,
-      bodyText,
-      formData: formData.pairs
-    });
-  };
-
   return (
     <div className="space-y-4 p-6">
       <UrlBar
@@ -144,7 +171,7 @@ export function RequestBuilder({
         onMethodChange={setMethod}
         url={url}
         onUrlChange={setUrl}
-        onSend={handleSend}
+        onSend={() => void handleSend()}
         onCancel={cancel}
         isLoading={isLoading}
       />
@@ -170,6 +197,7 @@ export function RequestBuilder({
           <TabsTrigger value="headers">Headers</TabsTrigger>
           <TabsTrigger value="params">Query Params</TabsTrigger>
           <TabsTrigger value="body">Body</TabsTrigger>
+          <TabsTrigger value="variables">Variables</TabsTrigger>
           <TabsTrigger value="assertions">
             Assertions {assertions.assertions.length > 0 ? `(${assertions.assertions.length})` : ""}
           </TabsTrigger>
@@ -182,7 +210,8 @@ export function RequestBuilder({
             onUpdate={headers.updatePair}
             onToggle={headers.togglePair}
             onRemove={headers.removePair}
-            keyPlaceholder="Header"
+            keyPlaceholder="Header (e.g. Authorization)"
+            valuePlaceholder="Value (e.g. Bearer {{token}})"
             emptyLabel="No headers yet."
           />
         </TabsContent>
@@ -195,6 +224,7 @@ export function RequestBuilder({
             onToggle={queryParams.togglePair}
             onRemove={queryParams.removePair}
             keyPlaceholder="Param"
+            valuePlaceholder="Value"
             emptyLabel="No query params yet."
           />
         </TabsContent>
@@ -210,6 +240,19 @@ export function RequestBuilder({
             onFormUpdate={formData.updatePair}
             onFormToggle={formData.togglePair}
             onFormRemove={formData.removePair}
+          />
+        </TabsContent>
+
+        <TabsContent value="variables" className="pt-3">
+          <KeyValueEditor
+            pairs={variables.pairs}
+            onAdd={variables.addPair}
+            onUpdate={variables.updatePair}
+            onToggle={variables.togglePair}
+            onRemove={variables.removePair}
+            keyPlaceholder="Variable (e.g. baseUrl)"
+            valuePlaceholder="Value (e.g. https://api.prod.com)"
+            emptyLabel="No environment variables defined."
           />
         </TabsContent>
 
@@ -236,7 +279,7 @@ export function RequestBuilder({
 
       {isLoading ? (
         <div className="rounded-md border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
-          Sending request...
+          Executing request through secure proxy...
         </div>
       ) : null}
 
@@ -244,7 +287,7 @@ export function RequestBuilder({
 
       {!response && !isLoading && !error ? (
         <div className="rounded-md border border-dashed border-border px-3 py-8 text-center text-sm text-muted-foreground">
-          Send a request to see the response here.
+          Send a request to inspect response body, latency metrics, and assertion results.
         </div>
       ) : null}
     </div>
