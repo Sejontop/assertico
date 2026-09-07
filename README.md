@@ -23,7 +23,7 @@ An enterprise-grade API testing, validation, and contract intelligence platform 
 Assertico implements a hybrid execution and validation architecture. It decouples high-speed deterministic evaluation from heavy LLM contract analysis, enforcing strict network sandboxing on all outbound requests.
 
 <p align="center">
-  <img src="./public/architecture.png" alt="Assertico System Architecture & Analysis Pipeline" width="100%" />
+  <img src="./public/Architecture.png" alt="Assertico System Architecture & Analysis Pipeline" width="100%" />
 </p>
 
 ---
